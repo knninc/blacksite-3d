@@ -37,7 +37,7 @@ export function audioNormalization(buffer: Pick<AudioBuffer, "numberOfChannels" 
 }
 type Snapshot = { encounters: number; support: number; keycard: boolean; power: boolean };
 
-export function createGameAudio(options: { onError?: (message: string) => void } = {}) {
+export function createGameAudio(options: { onError?: (message: string) => void; immersive?: boolean } = {}) {
   let context: AudioContext | undefined;
   let master: GainNode | undefined;
   let musicBus: GainNode | undefined;
@@ -215,7 +215,7 @@ export function createGameAudio(options: { onError?: (message: string) => void }
     musicActive = musicCanPlay && state.status === "running" && !state.paused;
     if (musicActive && enabled) {
       if (!music) {
-        music = play("bgm", 0.12, undefined, true);
+        music = play("bgm", options.immersive ? 0.045 : 0.12, undefined, true);
         updateDucking();
       }
     } else stopVoices();
@@ -226,7 +226,7 @@ export function createGameAudio(options: { onError?: (message: string) => void }
       nextFootstep = state.elapsed;
       nextThreat = state.elapsed;
     } else {
-      if (!ambience) ambience = play("ambience", 0.08, undefined, true);
+      if (!ambience) ambience = play("ambience", options.immersive ? 0.14 : 0.08, undefined, true);
       const hidden = isHiding(state);
       const sameRoom = !hidden && state.killer.roomId === state.roomId;
       const adjacent = !hidden && CONNECTIONS.some(([a, b]) =>
@@ -234,7 +234,7 @@ export function createGameAudio(options: { onError?: (message: string) => void }
       if (previous && snapshot.encounters > previous.encounters) {
         play("apparition", 0.6, 1.8);
         nextThreat = state.elapsed + 5;
-      } else if (state.killer.encountered && (sameRoom || adjacent) && state.elapsed >= nextThreat) {
+      } else if ((options.immersive ? state.killer.spawned : state.killer.encountered) && (sameRoom || adjacent) && state.elapsed >= nextThreat) {
         play("whisper", sameRoom ? 0.35 : 0.22, 1.6);
         nextThreat = state.elapsed + (sameRoom ? 5 : 8);
       }

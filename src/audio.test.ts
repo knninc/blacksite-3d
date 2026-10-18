@@ -142,6 +142,23 @@ test("muting while fetch is pending prevents a stale load from starting sound", 
   assert.equal(env.playing().length, 0);
 });
 
+test("immersive mode foreshadows a nearby spawned entity before first contact, but never before spawn", async (t) => {
+  const env = browserAudio(t);
+  const audio = createGameAudio({ immersive: true });
+  t.after(() => audio.dispose());
+  await audio.setEnabled(true);
+  env.state.killer.roomId = env.state.roomId;
+  audio.update(env.state, true);
+  assert.equal(env.played("whisper").length, 0);
+  env.state.killer.spawned = true;
+  audio.update(env.state, true);
+  audio.update(env.state, true);
+  assert.equal(env.state.killer.encountered, false);
+  assert.equal(env.played("whisper").length, 1);
+  audio.update(env.state, false, false);
+  assert.equal(env.playing().length, 0);
+});
+
 test("reset invalidates pending work and dispose is final and idempotent", async (t) => {
   const env = browserAudio(t);
   const gate = deferred();

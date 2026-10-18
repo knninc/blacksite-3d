@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { actorPosition, isHiding, ROOMS, routePosition, type GameState, type RoomId } from "../simulation.ts";
-import { CELL_SIZE, MAP_SCALE, WALL_HEIGHT, createWorldLayout, distanceToNavigation, navigationRoutes, roomCenter, toWorld } from "./world.ts";
+import { CELL_SIZE, MAP_SCALE, WALL_HEIGHT, createWorldLayout, distanceToNavigation, isWorldWalkable, navigationRoutes, roomCenter, toWorld } from "./world.ts";
 
 export interface Hospital3D {
   update(state: GameState, dt: number, look?: { yaw: number; pitch: number }, selected?: RoomId): void;
@@ -11,8 +11,8 @@ export interface Hospital3D {
 /** A read-only view of the simulation. The caller owns its clock and all rules. */
 export function createHospital3D(container: HTMLElement): Hospital3D {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x101d1e);
-  scene.fog = new THREE.FogExp2(0x18292a, .035);
+  scene.background = new THREE.Color(0x050809);
+  scene.fog = new THREE.FogExp2(0x0b1113, .065);
   const camera = new THREE.PerspectiveCamera(71, 1, .07, 65);
   camera.rotation.order = "YXZ";
   scene.add(camera);
@@ -20,7 +20,7 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = .9;
+  renderer.toneMappingExposure = 1.02;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   const canvas = renderer.domElement;
@@ -41,9 +41,9 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
     const mesh = new THREE.Mesh(cube, mat);
     mesh.position.set(x, y, z); mesh.scale.set(w, h, d); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
-  const plaster = surface(0xb0b7ac), trim = surface(0x3e7770), rust = surface(0x605a43), metal = surface(0x64746e, .58, .6);
+  const plaster = surface(0xa6aaa0), trim = surface(0x344e49), rust = surface(0x4c392b), metal = surface(0x64746e, .58, .6);
   const dark = surface(0x18272a), bedFrame = surface(0x778781, .48, .6), mattress = surface(0xa6b5a8), fabric = surface(0x516d68);
-  const whiteGlow = material(new THREE.MeshStandardMaterial({ color: 0xc9e8d5, emissive: 0x94d4b4, emissiveIntensity: 1.4 }));
+  const whiteGlow = material(new THREE.MeshStandardMaterial({ color: 0x91a79d, emissive: 0x728b78, emissiveIntensity: .75 }));
   const amberGlow = material(new THREE.MeshBasicMaterial({ color: 0xf4bb63 }));
 
   function canvasTexture(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void) {
@@ -51,20 +51,43 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
     const ctx = sheet.getContext("2d"); if (ctx) draw(ctx);
     const texture = new THREE.CanvasTexture(sheet); texture.colorSpace = THREE.SRGBColorSpace; textures.add(texture); return texture;
   }
+  // Deterministic stains and cracks keep every visit consistent without assets.
   const wallTexture = canvasTexture(256, 256, (ctx) => {
-    ctx.fillStyle = "#bbc2b7"; ctx.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 2000; i++) {
+    ctx.fillStyle = "#a9afa2"; ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 1700; i++) {
       const x = (i * 73) % 256, y = (i * 131) % 256;
-      ctx.fillStyle = `rgba(30,50,45,${.015 + (i % 7) * .005})`; ctx.fillRect(x, y, 1 + i % 3, 2 + i % 5);
+      ctx.fillStyle = `rgba(24,32,24,${.025 + (i % 7) * .009})`; ctx.fillRect(x, y, 1 + i % 3, 2 + i % 5);
     }
-    const stain = ctx.createLinearGradient(0, 130, 0, 256); stain.addColorStop(0, "transparent"); stain.addColorStop(1, "rgba(30,50,45,.18)");
-    ctx.fillStyle = stain; ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 27; i++) {
+      const x = i * 67 % 256, y = i * 43 % 236;
+      const stain = ctx.createLinearGradient(x, y, x, y + 65);
+      stain.addColorStop(0, "rgba(45,36,22,.28)"); stain.addColorStop(1, "rgba(45,36,22,0)");
+      ctx.fillStyle = stain; ctx.fillRect(x, y, 3 + i % 9, 65);
+    }
+    ctx.strokeStyle = "rgba(26,31,25,.36)"; ctx.lineWidth = .7;
+    for (let i = 0; i < 8; i++) {
+      const x = i * 43 % 256; ctx.beginPath(); ctx.moveTo(x, 0);
+      ctx.lineTo(x + 6, 34 + i * 3); ctx.lineTo(x - 2, 47 + i * 3); ctx.lineTo(x + 9, 81 + i * 4); ctx.stroke();
+    }
+    const damp = ctx.createLinearGradient(0, 165, 0, 256); damp.addColorStop(0, "transparent"); damp.addColorStop(1, "rgba(16,29,22,.65)");
+    ctx.fillStyle = damp; ctx.fillRect(0, 0, 256, 256);
   });
   wallTexture.wrapS = wallTexture.wrapT = THREE.RepeatWrapping;
-  plaster.map = wallTexture;
+  plaster.map = wallTexture; trim.map = wallTexture;
+  const floorTexture = canvasTexture(128, 128, (ctx) => {
+    ctx.fillStyle = "#8b9384"; ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = "#303a34"; ctx.lineWidth = 3; ctx.strokeRect(0, 0, 128, 128);
+    for (let i = 0; i < 550; i++) {
+      ctx.fillStyle = `rgba(10,18,16,${.04 + i % 5 * .02})`;
+      ctx.fillRect(i * 31 % 128, i * 67 % 128, 1 + i % 5, 1 + i % 3);
+    }
+    ctx.strokeStyle = "rgba(22,27,21,.45)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, 78); ctx.lineTo(37, 69); ctx.lineTo(49, 79); ctx.lineTo(90, 67); ctx.stroke();
+  });
 
   const layout = createWorldLayout();
-  const floorMaterials = [surface(0x687b71, .43, .08), surface(0x5e7269, .46, .08)];
+  const floorMaterials = [surface(0x617065, .7, .05), surface(0x4f5d54, .78, .04)];
+  floorMaterials.forEach((mat) => { mat.map = floorTexture; });
   const tileSets = layout.cells.reduce<[typeof layout.cells, typeof layout.cells]>((sets, cell) => {
     sets[(cell.column + cell.row) % 2].push(cell); return sets;
   }, [[], []]);
@@ -93,8 +116,8 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
     box(scene, metal, wall.x, .92, wall.z, w + .11, .065, d + .11);
   }
 
-  const hemisphere = new THREE.HemisphereLight(0xb7dacb, 0x28322c, .95); scene.add(hemisphere);
-  const fill = new THREE.AmbientLight(0xaccabc, .25); scene.add(fill);
+  const hemisphere = new THREE.HemisphereLight(0x788c91, 0x111310, .22); scene.add(hemisphere);
+  const fill = new THREE.AmbientLight(0x81928a, .055); scene.add(fill);
   const roomFixtures = new Map<RoomId, { light: THREE.PointLight; bulb: THREE.MeshStandardMaterial; panel: THREE.MeshStandardMaterial; ghost: THREE.Group; whisper: THREE.Group }>();
   const corridorFixtures: THREE.PointLight[] = [];
 
@@ -134,29 +157,121 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
     box(group, bedFrame, -.58, 1.02, .1, .035, .64, 1.3);
   }
 
+  const clothTexture = canvasTexture(128, 256, (ctx) => {
+    ctx.fillStyle = "#535348"; ctx.fillRect(0, 0, 128, 256);
+    for (let i = 0; i < 58; i++) {
+      const x = i * 37 % 128;
+      ctx.fillStyle = `rgba(5,8,7,${.13 + i % 5 * .07})`; ctx.fillRect(x, 0, 1 + i % 4, 256);
+    }
+    const hem = ctx.createLinearGradient(0, 120, 0, 256); hem.addColorStop(0, "transparent"); hem.addColorStop(1, "#090b09");
+    ctx.fillStyle = hem; ctx.fillRect(0, 0, 128, 256);
+  });
+  const dissolveTexture = canvasTexture(128, 128, (ctx) => {
+    for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+      const n = ((x * 73 + y * 151 + x * y * 31) % 233) / 233;
+      const value = Math.floor(45 + n * 210); ctx.fillStyle = `rgb(${value},${value},${value})`; ctx.fillRect(x, y, 1, 1);
+    }
+  });
+  dissolveTexture.colorSpace = THREE.NoColorSpace;
+  const limbGeometry = geometry(new THREE.CylinderGeometry(.075, .1, 1, 7));
+  const jointGeometry = geometry(new THREE.SphereGeometry(1, 12, 10));
+  const robeGeometry = geometry(new THREE.CylinderGeometry(.24, .47, 1.65, 13, 6, true));
+  // Uneven hem, collapsed shoulder and an off-axis neck avoid a toy-like symmetry.
+  const robeVertices = robeGeometry.attributes.position;
+  for (let i = 0; i < robeVertices.count; i++) {
+    const y = robeVertices.getY(i), x = robeVertices.getX(i), z = robeVertices.getZ(i);
+    robeVertices.setXYZ(i, x * (1 + Math.sin(i * 2.1) * .065), y < -.8 ? y + .07 + Math.sin(i * 3.7) * .095 : y, z);
+  }
+  robeGeometry.computeVertexNormals();
+  const maskFaceGeometry = geometry(new THREE.PlaneGeometry(.56, .84, 20, 24));
+  maskFaceGeometry.rotateY(Math.PI);
+  const faceVertices = maskFaceGeometry.attributes.position;
+  for (let i = 0; i < faceVertices.count; i++) {
+    const x = faceVertices.getX(i);
+    faceVertices.setXYZ(i, x, faceVertices.getY(i) + .055, -.145 - .12 * Math.sqrt(Math.max(0, 1 - (x / .28) ** 2)));
+  }
+  maskFaceGeometry.computeVertexNormals();
+  const texturedFaces: { material: THREE.MeshStandardMaterial; face: THREE.Mesh; fallback: THREE.Object3D[] }[] = [];
+  interface FigureRig { head: THREE.Group; arms: THREE.Group[]; ghostMaterials: THREE.MeshStandardMaterial[] }
+  const figures = new Map<THREE.Group, FigureRig>();
   function figure(ghost = false) {
     const group = new THREE.Group();
-    const robe = ghost ? material(new THREE.MeshStandardMaterial({ color: 0x8daca0, transparent: true, opacity: .38, emissive: 0x335a50, side: THREE.DoubleSide })) : surface(0x121c1d);
-    const mask = ghost ? robe : surface(0xc1b99c, .74);
-    const torso = new THREE.Mesh(geometry(new THREE.CylinderGeometry(.25, .46, 1.3, 9)), robe); torso.position.y = 1.23; group.add(torso);
-    const head = new THREE.Mesh(geometry(new THREE.SphereGeometry(.29, 13, 10)), mask); head.position.set(0, 2.04, 0); head.scale.set(.94, 1.13, .8); group.add(head);
+    const ghostMaterials: THREE.MeshStandardMaterial[] = [];
+    const figureSurface = (color: number, cloth = false) => {
+      const mat = material(new THREE.MeshStandardMaterial({ color, roughness: .96, map: cloth ? clothTexture : null,
+        side: THREE.DoubleSide, transparent: ghost, opacity: ghost ? .92 : 1,
+        alphaMap: ghost ? dissolveTexture : null, alphaTest: ghost ? .025 : 0,
+        emissive: ghost ? color : 0x000000, emissiveIntensity: ghost ? .08 : 0 }));
+      if (ghost) ghostMaterials.push(mat); return mat;
+    };
+    const robe = figureSurface(ghost ? 0x7e8c7d : 0x414139, true);
+    const skin = figureSurface(ghost ? 0xa6b4a2 : 0x8b8d78);
+    const mask = figureSurface(ghost ? 0xc6cbbb : 0xb6b3a0);
+    const voidMat = figureSurface(0x030505);
+    const ellipsoid = (parent: THREE.Object3D, mat: THREE.Material, x: number, y: number, z: number, w: number, h: number, d: number) => {
+      const mesh = new THREE.Mesh(jointGeometry, mat); mesh.position.set(x, y, z); mesh.scale.set(w, h, d);
+      mesh.castShadow = !ghost; mesh.receiveShadow = true; parent.add(mesh); return mesh;
+    };
+    const torso = new THREE.Mesh(robeGeometry, robe); torso.position.set(.04, 1.19, .03); torso.rotation.z = -.055;
+    torso.castShadow = !ghost; torso.receiveShadow = true; group.add(torso);
+    ellipsoid(group, robe, 0, 1.97, .025, .37, .18, .19);
+    // Long bare shins below a filthy ward gown.
     for (const side of [-1, 1]) {
-      const ear = new THREE.Mesh(geometry(new THREE.ConeGeometry(.14, .39, 3)), mask); ear.position.set(side * .21, 2.36, 0); ear.rotation.z = side * -.21; group.add(ear);
-      box(group, robe, side * .18, .32, 0, .17, .64, .21);
-      const arm = box(group, robe, side * .38, 1.17, 0, .14, 1.16, .17); arm.rotation.z = side * -.13;
-      box(group, mask, side * .45, .58, .025, .11, .24, .1);
-      box(group, dark, side * .115, 2.08, -.218, .13, .115, .035);
-      box(group, amberGlow, side * .115, 2.08, -.242, .036, .04, .018);
+      const leg = box(group, skin, side * .17, .29, .03, .105, .63, .12); leg.rotation.z = side * .06;
+      box(group, voidMat, side * .17, .055, -.1, .15, .1, .34);
     }
-    box(group, dark, 0, 1.94, -.223, .13, .035, .026);
-    group.visible = false; scene.add(group); return group;
+    const head = new THREE.Group(); head.position.set(.08, 2.35, -.025); head.rotation.z = -.24; head.rotation.x = .13; group.add(head);
+    ellipsoid(head, skin, -.015, -.12, .03, .1, .28, .1);
+    ellipsoid(head, voidMat, 0, .055, .06, .255, .38, .22);
+    const fallback: THREE.Object3D[] = [ellipsoid(head, mask, 0, .01, -.095, .225, .305, .145)];
+    // A broken, narrow feline votive mask; the motif survives without cute ears or glowing pupils.
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(geometry(new THREE.ConeGeometry(.095, side < 0 ? .25 : .16, 3)), mask);
+      ear.position.set(side * .17, .285, -.025); ear.rotation.z = side * -.34; ear.castShadow = !ghost; head.add(ear); fallback.push(ear);
+      const socket = ellipsoid(head, voidMat, side * .099, .074 + side * .014, -.225, .071, .095, .027); socket.rotation.z = side * -.22;
+      const tear = box(head, voidMat, side * .092, -.04, -.231, .018, .17, .012); tear.rotation.z = side * .12;
+      fallback.push(socket, tear);
+      // Stringy hair hangs past one cheek, hiding the edge of the mask.
+      for (let i = 0; i < 4; i++) {
+        const hair = box(head, voidMat, side * (.183 + i * .012), -.02 - i * .025, -.01 - i * .018, .028, .57 + i * .06, .034);
+        hair.rotation.z = side * (.04 + i * .025);
+      }
+    }
+    fallback.push(ellipsoid(head, voidMat, .025, -.16, -.225, .044, .092, .025));
+    const crack = box(head, voidMat, -.028, .22, -.231, .009, .18, .011); crack.rotation.z = .32; fallback.push(crack);
+    const faceMaterial = material(new THREE.MeshStandardMaterial({ color: 0xd7d4c3, roughness: .95, transparent: true, alphaTest: .035, side: THREE.FrontSide }));
+    if (ghost) ghostMaterials.push(faceMaterial);
+    const face = new THREE.Mesh(maskFaceGeometry, faceMaterial); face.visible = false; face.receiveShadow = true; head.add(face);
+    texturedFaces.push({ material: faceMaterial, face, fallback });
+    const arms: THREE.Group[] = [];
+    for (const side of [-1, 1]) {
+      const arm = new THREE.Group(); arm.position.set(side * .36, 1.94 + side * .045, .005); arm.rotation.z = side * .09; group.add(arm); arms.push(arm);
+      const upper = new THREE.Mesh(limbGeometry, robe); upper.position.y = -.36; upper.scale.y = .79; upper.castShadow = !ghost; arm.add(upper);
+      const lower = new THREE.Group(); lower.position.set(side * .035, -.73, -.02); lower.rotation.x = side < 0 ? -.16 : .12; arm.add(lower);
+      const forearm = new THREE.Mesh(limbGeometry, skin); forearm.position.y = -.36; forearm.scale.set(.6, .82 + side * .08, .65); forearm.castShadow = !ghost; lower.add(forearm);
+      ellipsoid(lower, skin, 0, -.8, -.018, .065, .14, .045);
+      for (let finger = 0; finger < 4; finger++) {
+        const digit = box(lower, skin, (finger - 1.5) * .027, -.95 - finger % 2 * .035, -.035, .018, .25, .022);
+        digit.rotation.z = (finger - 1.5) * .08;
+      }
+    }
+    // Every surface retains depth testing: figures disappear behind real walls.
+    group.traverse((part) => { if (part instanceof THREE.Mesh) part.castShadow = !ghost; });
+    group.visible = false; scene.add(group); figures.set(group, { head, arms, ghostMaterials }); return group;
   }
   const killer = figure();
+  function animateFigure(group: THREE.Group, time: number, moving: boolean, still: boolean) {
+    const rig = figures.get(group)!;
+    const sway = still ? 0 : Math.sin(time * (moving ? 2.6 : .85));
+    rig.head.rotation.z = -.24 + sway * .035;
+    rig.arms.forEach((arm, index) => { arm.rotation.x = still ? 0 : Math.sin(time * 1.7 + index * 1.9) * (moving ? .18 : .035); });
+    group.rotation.z = still ? 0 : sway * .012;
+  }
 
   for (const room of ROOMS) {
     const center = toWorld(roomCenter(room.id)), left = room.x / MAP_SCALE, top = room.y / MAP_SCALE;
     const width = room.w / MAP_SCALE, depth = room.h / MAP_SCALE;
-    const light = new THREE.PointLight(room.id === "generator" || room.id === "exit" ? 0xf6c48a : 0xb5e4d2, 24, 12, 1.4);
+    const light = new THREE.PointLight(room.id === "generator" || room.id === "exit" ? 0xf6c48a : 0x9cb9ac, 6.5, 9, 1.65);
     light.position.set(center.x, 2.85, center.z); scene.add(light);
     const bulb = whiteGlow.clone(); materials.add(bulb);
     const fixture = box(scene, dark, center.x, 3.17, center.z, 1.72, .12, .42);
@@ -226,7 +341,7 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
         const alongX = Math.abs(b.x - a.x) > Math.abs(b.z - a.z);
         box(scene, dark, x, 3.15, z, alongX ? 1.35 : .3, .11, alongX ? .3 : 1.35);
         box(scene, whiteGlow, x, 3.08, z, alongX ? 1.2 : .16, .025, alongX ? .16 : 1.2);
-        const lamp = new THREE.PointLight(0x91cdb6, 11, 7, 1.5); lamp.position.set(x, 2.85, z); scene.add(lamp); corridorFixtures.push(lamp);
+        const lamp = new THREE.PointLight(0x7f9a8c, 3.5, 6, 1.7); lamp.position.set(x, 2.85, z); scene.add(lamp); corridorFixtures.push(lamp);
       }
     }
   }
@@ -236,11 +351,13 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
   box(scene, amberGlow, exitCenter.x, 1.0, 25.28, 1.8, .1, .12);
   sign(scene, "EXIT  ↑", "KEYCARD + EMERGENCY POWER", exitCenter.x, 2.9, 25.23, Math.PI, true, 2.7);
 
-  const torch = new THREE.SpotLight(0xe4efcd, 62, 20, Math.PI / 6.5, .68, 1.3);
+  const torch = new THREE.SpotLight(0xe3e6ce, 86, 19, Math.PI / 6.2, .82, 1.35);
   torch.position.set(.18, -.15, -.08); torch.target.position.set(0, -.1, -8);
   torch.castShadow = true; torch.shadow.mapSize.set(512, 512); torch.shadow.bias = -.0007; torch.shadow.normalBias = .025;
   torch.shadow.camera.near = .1; torch.shadow.camera.far = 22;
   camera.add(torch); camera.add(torch.target);
+  // A dim wide spill preserves nearby orientation outside the narrow torch core.
+  const torchSpill = new THREE.PointLight(0xa6b4aa, 1.6, 3.7, 1.5); camera.add(torchSpill);
   const torchBody = box(camera, dark, .29, -.35, -.6, .12, .12, .36); torchBody.castShadow = false;
   const torchRim = box(camera, metal, .29, -.35, -.8, .15, .15, .07); torchRim.castShadow = false;
 
@@ -277,13 +394,47 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
   canvas.addEventListener("pointerup", pointerUp); canvas.addEventListener("pointercancel", pointerUp); canvas.addEventListener("lostpointercapture", pointerUp); canvas.addEventListener("keydown", keyboard);
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let previousPosition: { x: number; z: number } | null = null, previousElapsed = -1, previousStatus: GameState["status"] = "waiting", fadeAmount = 0, disposed = false;
+  canvas.dataset.maskTexture = "loading";
+  const maskTexture = new THREE.TextureLoader().load("/nuko-mask-v1.png", texture => {
+    if (disposed) { texture.dispose(); return; }
+    texture.colorSpace = THREE.SRGBColorSpace;
+    for (const record of texturedFaces) {
+      record.material.map = texture; record.material.needsUpdate = true;
+      record.face.visible = true; record.fallback.forEach(part => { part.visible = false; });
+    }
+    canvas.dataset.maskTexture = "ready";
+  }, undefined, () => { if (!disposed) canvas.dataset.maskTexture = "unavailable"; });
+  textures.add(maskTexture);
+  let animationTime = 0, apparitionCount = 0;
+  const apparitionPresentations = new Map<RoomId, { effectId: number; presented: boolean }>();
+  const viewDirection = new THREE.Vector3();
+  const frustum = new THREE.Frustum(), viewMatrix = new THREE.Matrix4();
+  const apparitionCenter = new THREE.Vector3();
+  const apparitionBounds = new THREE.Sphere(apparitionCenter, .65);
+  // Walk the same occupied grid as the renderer before anchoring a hallucination.
+  // This never writes the simulation, nor does it move the actual killer.
+  function placeApparition(group: THREE.Group) {
+    camera.getWorldDirection(viewDirection);
+    const horizontalLength = Math.hypot(viewDirection.x, viewDirection.z) || 1;
+    const dx = viewDirection.x / horizontalLength, dz = viewDirection.z / horizontalLength;
+    let ahead = .3;
+    for (let sample = .3; sample <= 2.2; sample += .1) {
+      if (!isWorldWalkable(layout, camera.position.x + dx * sample, camera.position.z + dz * sample)) break;
+      ahead = sample;
+    }
+    group.position.set(camera.position.x + dx * ahead, 0, camera.position.z + dz * ahead);
+    // Match the current vertical look for the first presentation, then stay
+    // anchored in world space so looking away remains possible.
+    group.position.y = Math.max(-1.6, Math.min(.25, camera.position.y + viewDirection.y / horizontalLength * ahead - 1.92));
+    group.rotation.y = Math.atan2(group.position.x - camera.position.x, group.position.z - camera.position.z);
+  }
   const selectedRing = new THREE.Mesh(geometry(new THREE.RingGeometry(.85, .89, 48)), material(new THREE.MeshBasicMaterial({ color: 0xe8bc75, transparent: true, opacity: .55, side: THREE.DoubleSide })));
   selectedRing.rotation.x = -Math.PI / 2; selectedRing.position.y = .015; scene.add(selectedRing);
 
   return {
     update(state, dt, look, selected) {
       if (disposed) return;
-      const delta = clamp(Number.isFinite(dt) ? dt : 0, 0, .1);
+      const delta = state.paused ? 0 : clamp(Number.isFinite(dt) ? dt : 0, 0, .1);
       const point = toWorld(actorPosition(state, "sam"));
       const reset = state.elapsed < previousElapsed || (state.status === "waiting" && previousStatus !== "waiting");
       const distance = previousPosition ? Math.hypot(point.x - previousPosition.x, point.z - previousPosition.z) : 0;
@@ -296,41 +447,79 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
       } else if (previousPosition && !discontinuity && distance > .001) {
         desiredYaw = Math.atan2(previousPosition.x - point.x, previousPosition.z - point.z);
       }
-      if (reset) { yawOffset = 0; pitchOffset = 0; desiredYaw = -Math.PI / 2; baseYaw = desiredYaw; }
+      if (reset) {
+        yawOffset = 0; pitchOffset = 0; desiredYaw = -Math.PI / 2; baseYaw = desiredYaw;
+        animationTime = 0; apparitionCount = 0; apparitionPresentations.clear();
+      }
+      if (state.status === "running") animationTime += delta;
       const turn = Math.atan2(Math.sin(desiredYaw - baseYaw), Math.cos(desiredYaw - baseYaw));
       baseYaw += turn * (reducedMotion.matches ? 1 : 1 - Math.exp(-delta * 7));
-      const moving = state.status === "running" && !state.paused && state.currentAction?.action === "move";
-      const bob = moving && !reducedMotion.matches ? Math.sin(state.elapsed * 8) * .018 : 0;
+      const moving = state.status === "running" && state.currentAction?.action === "move";
+      const bob = moving && !reducedMotion.matches ? Math.sin(animationTime * 8) * .018 : 0;
       camera.position.set(point.x, (isHiding(state) ? 1.03 : 1.64) + bob, point.z);
       camera.rotation.set(clamp(pitchOffset + (look?.pitch || 0), -.72, .62), baseYaw + yawOffset + (look?.yaw || 0), 0, "YXZ");
       const currentBlackout = state.effects.some((effect) => effect.roomId === state.roomId && effect.type === "blackout" && effect.expiresAt > state.elapsed);
-      hemisphere.intensity = currentBlackout ? .27 : .95; fill.intensity = currentBlackout ? .06 : .25;
-      const shimmer = reducedMotion.matches ? 1 : .97 + Math.sin(state.elapsed * 6.2) * .025;
+      const enemyPoint = state.killer.spawned ? toWorld(actorPosition(state, "killer")) : null;
+      const enemyDistance = enemyPoint ? Math.hypot(enemyPoint.x - point.x, enemyPoint.z - point.z) : 40;
+      const tension = clamp(Math.max(state.fear / 100, 1 - enemyDistance / 9), 0, 1);
+      hemisphere.intensity = currentBlackout ? .075 : .22; fill.intensity = currentBlackout ? .018 : .055;
+      // Slow irregular ballast sag, never a rapid strobe. Both clocks freeze at dt=0.
+      const ballast = reducedMotion.matches ? 1 : .94 + Math.sin(animationTime * 1.45) * .035 + Math.sin(animationTime * .47) * .025;
+      const breath = reducedMotion.matches ? 0 : (Math.sin(animationTime * 2.15) + 1) * .5 * tension;
+      let currentApparition = false, visibleApparitions = 0;
+      camera.updateMatrixWorld(); viewMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); frustum.setFromProjectionMatrix(viewMatrix);
       for (const [id, fixture] of roomFixtures) {
         const active = state.effects.filter((effect) => effect.roomId === id && effect.expiresAt > state.elapsed);
         const blackout = active.some((effect) => effect.type === "blackout");
-        fixture.light.intensity = blackout ? .4 : 24 * shimmer;
-        fixture.bulb.emissiveIntensity = blackout ? .025 : 1.4;
+        const pressure = id === state.roomId ? 1 - breath * .22 : 1;
+        fixture.light.intensity = blackout ? .1 : 6.5 * ballast * pressure;
+        fixture.bulb.emissiveIntensity = blackout ? .008 : .75 * ballast * pressure;
         const locked = (state.locks[id] ?? 0) > state.elapsed;
         fixture.panel.color.setHex(locked ? 0xce4b36 : 0x68ae95); fixture.panel.emissive.setHex(locked ? 0x9d261a : 0x3a9d79);
-        fixture.ghost.visible = active.some((effect) => effect.type === "apparition");
-        fixture.ghost.rotation.y = Math.atan2(fixture.ghost.position.x - point.x, fixture.ghost.position.z - point.z);
-        fixture.ghost.position.y = reducedMotion.matches ? 0 : Math.sin(state.elapsed * 2) * .06;
+        const apparition = active.find((effect) => effect.type === "apparition");
+        fixture.ghost.visible = !!apparition;
+        if (apparition) {
+          let presentation = apparitionPresentations.get(id);
+          if (!presentation || presentation.effectId !== apparition.id) {
+            presentation = { effectId: apparition.id, presented: false }; apparitionPresentations.set(id, presentation);
+          }
+          if (id === state.roomId && !presentation.presented) {
+            placeApparition(fixture.ghost); presentation.presented = true; apparitionCount++;
+          }
+          // Appears clearly, holds, then breaks into black patches during its final second.
+          const remaining = apparition.expiresAt - state.elapsed;
+          const dissolve = reducedMotion.matches ? 0 : clamp(1 - remaining / 1.25, 0, 1);
+          for (const mat of figures.get(fixture.ghost)!.ghostMaterials) {
+            mat.opacity = .92 * (1 - dissolve * .85); mat.alphaTest = .025 + dissolve * .94;
+            mat.emissiveIntensity = .08 * (1 - dissolve);
+          }
+          animateFigure(fixture.ghost, animationTime, false, reducedMotion.matches);
+          if (id === state.roomId) currentApparition = true;
+          apparitionCenter.copy(fixture.ghost.position); apparitionCenter.y += 1.7;
+          if (frustum.intersectsSphere(apparitionBounds)) visibleApparitions++;
+        } else apparitionPresentations.delete(id);
         fixture.whisper.visible = active.some((effect) => effect.type === "whisper");
-        fixture.whisper.rotation.y = reducedMotion.matches ? 0 : state.elapsed * .13;
+        fixture.whisper.rotation.y = reducedMotion.matches ? 0 : animationTime * .13;
       }
-      corridorFixtures.forEach((lamp) => { lamp.intensity = (currentBlackout ? 2 : 11) * shimmer; });
+      corridorFixtures.forEach((lamp) => { lamp.intensity = (currentBlackout ? .18 : 3.5) * ballast * (1 - breath * .12); });
       killer.visible = state.killer.spawned;
-      if (killer.visible) {
-        const enemy = toWorld(actorPosition(state, "killer")); killer.position.set(enemy.x, 0, enemy.z);
-        // The mask faces negative Z in local space.
-        killer.rotation.y = Math.atan2(enemy.x - point.x, enemy.z - point.z);
-        if (!reducedMotion.matches && state.killer.targetRoomId) killer.position.y = Math.sin(state.elapsed * 7) * .035;
+      if (enemyPoint) {
+        killer.position.set(enemyPoint.x, 0, enemyPoint.z);
+        // The mask faces negative Z in local space. Position stays authoritative.
+        killer.rotation.y = Math.atan2(enemyPoint.x - point.x, enemyPoint.z - point.z);
+        animateFigure(killer, animationTime, !!state.killer.targetRoomId, reducedMotion.matches);
       }
+      canvas.dataset.apparitionCurrent = String(currentApparition);
+      canvas.dataset.apparitionPresentations = String(apparitionCount);
+      // Frustum count is explicitly a camera-range diagnostic, not an occlusion claim.
+      canvas.dataset.apparitionInFrustum = String(visibleApparitions);
+      canvas.dataset.visualTension = tension.toFixed(2);
       if (selected) { const center = toWorld(roomCenter(selected)); selectedRing.position.set(center.x, .016, center.z); selectedRing.visible = true; }
       else selectedRing.visible = false;
       exitDoor.position.x = exitCenter.x + (state.status === "escaped" ? 2.1 : 0);
-      torch.intensity = state.status === "contained" ? 28 : 62;
+      torch.intensity = (state.status === "contained" ? 45 : 86) * (1 - breath * .1);
+      torch.target.position.x = reducedMotion.matches ? 0 : Math.sin(animationTime * 1.2) * .05 * tension;
+      torchSpill.intensity = currentBlackout ? .85 : 1.6;
       fadeAmount = Math.max(0, fadeAmount - delta * 2.3); fade.style.opacity = String(fadeAmount);
       canvas.dataset.room = state.roomId; canvas.dataset.cameraX = point.x.toFixed(3); canvas.dataset.cameraZ = point.z.toFixed(3);
       canvas.dataset.killerVisible = String(killer.visible); canvas.dataset.scene = "perspective-3d";

@@ -6,6 +6,8 @@ AIサムの一人称で病院を体験し、プレイヤーは怪異として脱
 
 このforkのGitHubは [knninc/blacksite-3d](https://github.com/knninc/blacksite-3d) です。元の受賞版とは別のSite IDで公開します。[3D版の実装・検証範囲](docs/first-person-3d.md)
 
+[3D版を遊ぶ](https://blacksite-subject-view.minpakuproperty-mana.chatgpt.site)（所有者のChatGPTログインが必要）。元のOP・出現・接触・2種類の結末映像を3D版でも再生します。ドラッグ／矢印で視点、1〜4で干渉、Spaceで一時停止。「表示 簡潔／詳細」でHUDを切り替えられます。自動追従中、感覚への干渉は現在地、扉の封鎖は進行先に届きます。
+
 以下は引き継いだ2D版の説明です。実APIデモの合格条件は3D版でも同じで、ローカル試遊・ビルドだけでは合格扱いにしません。
 
 ## BLACKSITE — The Escape Experiment
