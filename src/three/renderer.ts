@@ -255,13 +255,14 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
   let yawOffset = 0, pitchOffset = 0, baseYaw = -Math.PI / 2, desiredYaw = baseYaw;
   let pointer: { id: number; x: number; y: number } | null = null;
   const clamp = THREE.MathUtils.clamp;
+  const wrapYaw = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
   const pointerDown = (event: PointerEvent) => {
     if (event.button !== 0) return;
     pointer = { id: event.pointerId, x: event.clientX, y: event.clientY }; canvas.setPointerCapture(event.pointerId); canvas.style.cursor = "grabbing"; canvas.focus({ preventScroll: true });
   };
   const pointerMove = (event: PointerEvent) => {
     if (!pointer || event.pointerId !== pointer.id) return;
-    yawOffset = clamp(yawOffset - (event.clientX - pointer.x) * .004, -1.3, 1.3);
+    yawOffset = wrapYaw(yawOffset - (event.clientX - pointer.x) * .004);
     pitchOffset = clamp(pitchOffset - (event.clientY - pointer.y) * .003, -.65, .5);
     pointer.x = event.clientX; pointer.y = event.clientY;
   };
@@ -270,7 +271,7 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
     const amounts: Record<string, [number, number]> = { ArrowLeft: [.13, 0], ArrowRight: [-.13, 0], ArrowUp: [0, .1], ArrowDown: [0, -.1] };
     if (event.key === "Home") { yawOffset = 0; pitchOffset = 0; event.preventDefault(); }
     const amount = amounts[event.key]; if (!amount) return;
-    event.preventDefault(); yawOffset = clamp(yawOffset + amount[0], -1.3, 1.3); pitchOffset = clamp(pitchOffset + amount[1], -.65, .5);
+    event.preventDefault(); yawOffset = wrapYaw(yawOffset + amount[0]); pitchOffset = clamp(pitchOffset + amount[1], -.65, .5);
   };
   canvas.addEventListener("pointerdown", pointerDown); canvas.addEventListener("pointermove", pointerMove);
   canvas.addEventListener("pointerup", pointerUp); canvas.addEventListener("pointercancel", pointerUp); canvas.addEventListener("lostpointercapture", pointerUp); canvas.addEventListener("keydown", keyboard);
@@ -301,7 +302,7 @@ export function createHospital3D(container: HTMLElement): Hospital3D {
       const moving = state.status === "running" && !state.paused && state.currentAction?.action === "move";
       const bob = moving && !reducedMotion.matches ? Math.sin(state.elapsed * 8) * .018 : 0;
       camera.position.set(point.x, (isHiding(state) ? 1.03 : 1.64) + bob, point.z);
-      camera.rotation.set(clamp(pitchOffset + (look?.pitch || 0), -.72, .62), baseYaw + clamp(yawOffset + (look?.yaw || 0), -1.5, 1.5), 0, "YXZ");
+      camera.rotation.set(clamp(pitchOffset + (look?.pitch || 0), -.72, .62), baseYaw + yawOffset + (look?.yaw || 0), 0, "YXZ");
       const currentBlackout = state.effects.some((effect) => effect.roomId === state.roomId && effect.type === "blackout" && effect.expiresAt > state.elapsed);
       hemisphere.intensity = currentBlackout ? .27 : .95; fill.intensity = currentBlackout ? .06 : .25;
       const shimmer = reducedMotion.matches ? 1 : .97 + Math.sin(state.elapsed * 6.2) * .025;
