@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import "../src/style.css";
 
 export const metadata: Metadata = {
-  title: "BLACKSITE — The Escape Experiment",
+  title: "BLACKSITE 3D — Subject View",
   description:
-    "AIが操作するサム・アルトマンの脱出を妨害する180秒のホラー実験。追尾するぬこぬこさんと、使用間隔をリセットするTiboが登場。",
+    "AIサムの一人称で病院を体験する3Dホラー試作。あなたは病院そのものとなり、停電・扉の封鎖・囁き・怪異で脱出を阻む。",
 };
 
 export const viewport: Viewport = { themeColor: "#090e0e" };

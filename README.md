@@ -1,4 +1,14 @@
-# BLACKSITE — The Escape Experiment
+# BLACKSITE 3D — Subject View
+
+AIサムの一人称で病院を体験し、プレイヤーは怪異として脱出を妨害する3D試作。独立したルールとAI判断を共有し、Three.jsで7部屋・廊下・照明・追跡者を描画します。移動と行動はAIが選び、プレイヤーは視点を見回して4つの妨害を使います。
+
+`npm run dev` のトップページが3D版、`/classic` が従来の2D版です。3D版のローカルAIはAPI通信なしで遊べます。実APIは新しいSiteへのサインインと、そのSiteの秘密設定が必要です。元の受賞版の秘密設定はコピーしません。
+
+このforkのGitHubは [knninc/blacksite-3d](https://github.com/knninc/blacksite-3d) です。元の受賞版とは別のSite IDで公開します。[3D版の実装・検証範囲](docs/first-person-3d.md)
+
+以下は引き継いだ2D版の説明です。実APIデモの合格条件は3D版でも同じで、ローカル試遊・ビルドだけでは合格扱いにしません。
+
+## BLACKSITE — The Escape Experiment
 
 AIが操作するサム・アルトマンの脱出を、建物に棲む怪異として妨害するブラウザーゲーム。キラーのぬこぬこさんがサムを追い、Tiboがランダムに現れて妨害の再使用を助けます。Phaser / TypeScript / Vinext を使用し、ChatGPT SitesのCloudflare Workers環境で動きます。
 

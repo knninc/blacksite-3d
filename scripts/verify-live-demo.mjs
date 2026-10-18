@@ -6,7 +6,7 @@ import { resolve, dirname } from "node:path";
 import { createState, applyDecision, applyKillerDecision, killerDecisions, sabotage, tick } from "../src/simulation.ts";
 import { legalDecisions, createSessionRequest, createDecisionRequest, createKillerDecisionRequest } from "../src/live-contract.ts";
 
-export const SITE_ORIGIN = "https://blacksite-escape-experiment.yasei-no-otoko.chatgpt.site";
+export const SITE_ORIGIN = "https://blacksite-subject-view.minpakuproperty-mana.chatgpt.site";
 export const MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 65_000;
 const RUN_TIMEOUT_MS = 180_000;

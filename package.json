@@ -10,15 +10,16 @@
     "dev": "node --env-file-if-exists=.env.local --import ./scripts/sites-env.mjs ./scripts/run-framework.mjs dev",
     "build": "tsc --noEmit && node scripts/run-framework.mjs build",
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
-    "test": "node --experimental-strip-types --test src/simulation.test.ts src/audio.test.ts server/api.test.mjs server/worker-api.test.mjs scripts/verify-live-demo.test.mjs",
+    "test": "node --experimental-strip-types --test src/simulation.test.ts src/audio.test.ts src/three/world.test.ts server/api.test.mjs server/worker-api.test.mjs scripts/verify-live-demo.test.mjs",
     "test:live": "node --experimental-strip-types scripts/verify-live-demo.mjs",
     "demo:ready": "node --experimental-strip-types scripts/verify-live-demo.mjs --check-only"
   },
   "dependencies": {
     "next": "16.3.4",
+    "phaser": "3.90.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "phaser": "3.90.0"
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
@@ -26,6 +27,7 @@
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/three": "0.186.0",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "react-server-dom-webpack": "19.2.6",

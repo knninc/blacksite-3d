@@ -1,7 +1,7 @@
-import GameClient from "./game-client";
+import Game3DClient from "./game-3d-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  return <GameClient />;
+  return <Game3DClient />;
 }
